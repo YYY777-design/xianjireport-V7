@@ -4459,48 +4459,93 @@ legend: {
                             children.forEach(function (ch) { total += countDiffusionLeaves(ch); });
                             return total;
                         }
+                        function calcInsightNodeGap(diffusionCount, isMobile, isLandscapeAll, lowDensityMode) {
+                            var base = isMobile ? 26 : 20;
+                            if (isLandscapeAll) base += 4;
+                            var slope = isMobile ? 1.4 : 1.0;
+                            var extra = Math.max(0, (diffusionCount || 0) - 8) * slope;
+                            var cap = isMobile ? 68 : 48;
+                            var gap = Math.round(base + Math.min(cap - base, extra));
+                            if (lowDensityMode) gap += isMobile ? 8 : 4;
+                            return Math.min(cap, gap);
+                        }
                         var treeCount = dataArr.length;
-                        var maxDiffusionCountPerTopic = 0;
-                        dataArr.forEach(function (rootNode) {
-                            maxDiffusionCountPerTopic = Math.max(maxDiffusionCountPerTopic, countDiffusionLeaves(rootNode));
+                        var isLandscapeAllMode = insightShowAllTopics && layoutCtx.isMobile && isInsightPathLandscapeActive();
+                        var treeMetrics = dataArr.map(function (rootNode) {
+                            return { diffusionCount: countDiffusionLeaves(rootNode) };
                         });
-                        // “全部”场景下第3级扩散媒体的纵向间距基准：
-                        // 24 为基础间距；当第3级媒体数量超过 10 时，每多 1 个增加 1，最多额外增加 18。
-                        // 如需更疏/更紧，可调整 24、10、18 这三个参数。
-                        var dynamicNodeGapForAll = 24 + Math.min(18, Math.max(0, maxDiffusionCountPerTopic - 10));
+                        var totalDiffusionCount = treeMetrics.reduce(function (sum, item) {
+                            return sum + (item.diffusionCount || 0);
+                        }, 0);
+                        var lowDensityThreshold = layoutCtx.isMobile ? 40 : 72;
+                        var lowDensityMode = insightShowAllTopics && totalDiffusionCount >= lowDensityThreshold;
+                        var sectionGapPx = insightShowAllTopics
+                            ? (layoutCtx.isMobile ? (lowDensityMode ? 30 : 22) : (lowDensityMode ? 20 : 14))
+                            : 0;
+                        var sectionHeights = [];
+                        var totalSectionHeight = 0;
+                        if (insightShowAllTopics) {
+                            var baseHeight = layoutCtx.isMobile
+                                ? (isLandscapeAllMode ? 260 : 220)
+                                : 180;
+                            var coeff = layoutCtx.isMobile
+                                ? (isLandscapeAllMode ? 15 : 12)
+                                : 8;
+                            if (lowDensityMode) coeff += layoutCtx.isMobile ? 3 : 2;
+                            treeMetrics.forEach(function (m) {
+                                var h = baseHeight + (m.diffusionCount || 0) * coeff;
+                                if (lowDensityMode && (m.diffusionCount || 0) >= 14) {
+                                    h += layoutCtx.isMobile ? 42 : 24;
+                                }
+                                sectionHeights.push(h);
+                                totalSectionHeight += h;
+                            });
+                            totalSectionHeight += sectionGapPx * Math.max(0, treeCount - 1);
+                        } else {
+                            sectionHeights = dataArr.map(function () { return 1; });
+                            totalSectionHeight = Math.max(1, treeCount);
+                        }
                         var pathWrap = document.getElementById('propInsightTreeViewWrap');
                         if (pathWrap) {
                             if (treeCount <= 1) {
                                 pathWrap.style.height = (window.innerWidth <= 768 ? 360 : 420) + 'px';
+                                pathWrap.style.overflowY = '';
                             } else {
-                                var perTreeHeight;
                                 if (insightShowAllTopics) {
-                                    // “全部”场景下每个话题分区高度：
-                                    // 随第3级扩散媒体数量线性增大，避免右侧媒体名称重叠。
-                                    // 如需更大间距，优先调大乘数 8/6 或最小值 260/220。
-                                    perTreeHeight = window.innerWidth <= 768
-                                        ? Math.min(640, Math.max(260, 170 + maxDiffusionCountPerTopic * 8))
-                                        : Math.min(560, Math.max(220, 150 + maxDiffusionCountPerTopic * 6));
+                                    var contentHeight = Math.round(totalSectionHeight);
+                                    var minHeight = window.innerWidth <= 768 ? 680 : 520;
+                                    var maxHeight = window.innerWidth <= 768 ? 5200 : 4200;
+                                    pathWrap.style.height = Math.min(maxHeight, Math.max(minHeight, contentHeight)) + 'px';
+                                    pathWrap.style.overflowY = 'auto';
                                 } else {
-                                    perTreeHeight = window.innerWidth <= 768 ? 210 : 170;
+                                    pathWrap.style.height = Math.max(480, treeCount * (window.innerWidth <= 768 ? 210 : 170)) + 'px';
+                                    pathWrap.style.overflowY = '';
                                 }
-                                pathWrap.style.height = Math.max(480, treeCount * perTreeHeight) + 'px';
                             }
                         }
+                        var cursor = 0;
                         opt.series = dataArr.map(function (treeData, idx) {
-                            var topPct = (idx * 100) / treeCount;
+                            var sectionHeight = sectionHeights[idx] || 1;
+                            var topPct = (cursor * 100) / totalSectionHeight;
+                            var heightPct = (sectionHeight * 100) / totalSectionHeight;
+                            var leafCount = treeMetrics[idx] ? treeMetrics[idx].diffusionCount : 0;
+                            var nodeGapForTree = insightShowAllTopics
+                                ? calcInsightNodeGap(leafCount, layoutCtx.isMobile, isLandscapeAllMode, lowDensityMode)
+                                : 16;
+                            var leafFontSize = lowDensityMode && layoutCtx.isMobile ? 10 : 11;
+                            cursor += sectionHeight + sectionGapPx;
                             return {
                                 type: 'tree',
                                 data: [treeData],
                                 top: topPct + '%',
-                                height: (100 / treeCount) + '%',
+                                height: heightPct + '%',
                                 left: '3%',
                                 right: '14%',
                                 symbol: 'circle',
                                 symbolSize: 6,
                                 orient: 'LR',
                                 edgeShape: 'curve',
-                                nodeGap: insightShowAllTopics ? dynamicNodeGapForAll : 16,
+                                nodeGap: nodeGapForTree,
                                 initialTreeDepth: -1,
                                 expandAndCollapse: true,
                                 animationDuration: 250,
@@ -4522,6 +4567,7 @@ legend: {
                                         position: 'right',
                                         align: 'left',
                                         distance: 6,
+                                        fontSize: leafFontSize,
                                         color: '#000000'
                                     }
                                 },
