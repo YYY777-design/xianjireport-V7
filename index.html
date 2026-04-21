@@ -1,6 +1,6 @@
 <html lang="zh-CN"><head>
     <meta charset="utf-8">
-    <title>传播路径-V7-6</title>
+    <title>传播路径-V7-7</title>
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <!-- bootstrap css -->
     
@@ -3764,7 +3764,7 @@ legend: {
                     }
 
                     function buildOneInsightTopicTree(topicName, rnd) {
-                        var nOrig = 2 + Math.floor(rnd() * 3);
+                        var nOrig = 1;
                         var origPool = insightShuffle(INSIGHT_ORIG_SOURCE_NAMES.slice(), rnd);
                         var origPicks = origPool.slice(0, Math.min(nOrig, origPool.length));
                         var peakHour = Math.floor(rnd() * 24);
@@ -4190,6 +4190,21 @@ legend: {
 
                     function treeDataForInsightChart(root, layoutCtx) {
                         var treeRoot = root;
+                        if (treeRoot && treeRoot.role === 'topic' && treeRoot.children && treeRoot.children.length) {
+                            var origNode = treeRoot.children.find(function (node) {
+                                return node && node.role === 'orig';
+                            }) || null;
+                            if (origNode) {
+                                var topicText = String(treeRoot.name || '').replace(/^话题[：:]\s*/, '');
+                                var origText = String(origNode.name || '原发媒体');
+                                treeRoot = Object.assign({}, treeRoot, {
+                                    name: '话题：' + topicText + '\n原发媒体：' + origText,
+                                    mediaLevel: origNode.mediaLevel || treeRoot.mediaLevel,
+                                    interaction: origNode.interaction != null ? origNode.interaction : treeRoot.interaction,
+                                    children: Array.isArray(origNode.children) ? origNode.children : []
+                                });
+                            }
+                        }
                         function clean(node, depth) {
                             var layerColor = getInsightLayerColor(node);
                             var out = {
@@ -4235,6 +4250,7 @@ legend: {
                                     align: 'left',
                                     distance: 6,
                                     fontSize: 11,
+                                    lineHeight: 15,//话题与原发媒体的行距
                                     color: rootColor
                                 };
                             }
@@ -4246,7 +4262,7 @@ legend: {
                             }
                             return out;
                         }
-                        return clean(root, 0);
+                        return clean(treeRoot, 0);
                     }
 
                     function getInsightTreeChartOption() {
@@ -4461,10 +4477,10 @@ legend: {
                                 if (insightShowAllTopics) {
                                     // “全部”场景下每个话题分区高度：
                                     // 随第3级扩散媒体数量线性增大，避免右侧媒体名称重叠。
-                                    // 如需更大间距，优先调大乘数 18/16 或最小值 300/260。
+                                    // 如需更大间距，优先调大乘数 8/6 或最小值 260/220。
                                     perTreeHeight = window.innerWidth <= 768
-                                        ? Math.min(640, Math.max(300, 170 + maxDiffusionCountPerTopic * 18))
-                                        : Math.min(560, Math.max(260, 150 + maxDiffusionCountPerTopic * 16));
+                                        ? Math.min(640, Math.max(260, 170 + maxDiffusionCountPerTopic * 8))
+                                        : Math.min(560, Math.max(220, 150 + maxDiffusionCountPerTopic * 6));
                                 } else {
                                     perTreeHeight = window.innerWidth <= 768 ? 210 : 170;
                                 }
