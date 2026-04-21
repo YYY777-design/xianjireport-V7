@@ -3207,7 +3207,7 @@ legend: {
                 }
                 body.prop-insight-landscape-body-lock {
                     overflow: hidden !important;
-                    touch-action: none;
+                    touch-action: manipulation;
                 }
                 #propInsightPathWrap:fullscreen,
                 #propInsightPathWrap:-webkit-full-screen,
@@ -3347,6 +3347,9 @@ legend: {
                     flex-wrap: nowrap;
                     overflow-x: auto;
                     overflow-y: hidden;
+                    -webkit-overflow-scrolling: touch;
+                    touch-action: pan-x;
+                    overscroll-behavior-x: contain;
                     white-space: nowrap;
                     margin-bottom: 0;
                 }
